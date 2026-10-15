@@ -117,16 +117,20 @@ dsh-git-manager/
 
 ## 安装 / 迁移 / 升级
 
-完整步骤见 **[INSTALL.md](INSTALL.md)**（新电脑安装、tgz / 源码目录 / Git 仓库 / 私有 npm 四种方式、
-自检清单、升级与卸载流程）。最简形式：
+完整步骤见 **[INSTALL.md](INSTALL.md)**（跨机器的 Git 仓库方式、本机源码目录方式、单 tgz 方式、私有 registry 方式、
+自检清单、升级与卸载流程）。要点：
 
 ```bash
-# 1) 打包成单个可移植文件
-npm test && npm pack          # → local-dsh-git-manager-1.0.0.tgz
-# 2) 在目标机器的 DSH 会话中让 Agent 执行：
-#    plugin_manager install_bundle   target = <tgz 的绝对路径>
-# 3) 若提示 restart-required，退出并重开 DSH
+# 本机（源码方式，改 client.js 自动热加载）
+#   plugin_manager install_bundle   target = <本目录绝对路径>
+# 跨机器（推荐 Git 仓库，不绑定本地路径）
+#   git clone <你的远端> ~/dsh-plugins/dsh-git-manager
+#   plugin_manager install_bundle   target = ~/dsh-plugins/dsh-git-manager
+# 若提示 restart-required，退出并重开 DSH
 ```
+
+> ⚠️ 本地目录 / 本地 tgz 方式会把**绝对路径**写进 profile 清单，之后不能移动或删除该来源，
+> 否则以后安装任何插件都会 ENOENT（详见 INSTALL.md「先读」一节）。
 
 安装后侧边栏「全局面板」区出现 **Git** 图标，点击打开 Git 工具窗口。
 
