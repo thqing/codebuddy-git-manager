@@ -112,8 +112,10 @@ npm test                 # 先保证 50 个用例通过
 git commit -am "..."     # 源码方式直接生效；tgz/npm 方式需要重新打包发布
 ```
 
-- **方式 A/B（源码或 link）**：Host 半边改动 → 让 Agent 重新 `install_bundle` 一次 → 重启 DSH；
-  `client.js` 改动 → 页面自动热加载，无需重启。
+- **方式 A/B（源码或 link）**：改完让 Agent 重新 `install_bundle` 一次，然后**重启 DSH**。
+  > 注意：`client.js` 的自动热加载只在插件源码位于**当前打开的 workspace 之内**时生效
+  > （本插件已搬到 `~/dsh-plugins/` 这类 workspace 之外的目录，所以改动不会再自动热加载，需要重启）。
+  > Host 半边（`index.js` / `git.js`）无论如何都要重启才生效。
 - **方式 C（tgz）/ D（npm）**：`npm pack` 出新包（版本号建议 +1）→ 覆盖固定目录里的旧包（**路径别变**）
   → 让 Agent 再用同一 target 执行 `install_bundle` → 重启 DSH。
 
