@@ -121,11 +121,11 @@ dsh-git-manager/
 自检清单、升级与卸载流程）。要点：
 
 ```bash
-# 本机（源码方式，改 client.js 自动热加载）
-#   plugin_manager install_bundle   target = <本目录绝对路径>
 # 跨机器（推荐 Git 仓库，不绑定本地路径）
-#   git clone <你的远端> ~/dsh-plugins/dsh-git-manager
-#   plugin_manager install_bundle   target = ~/dsh-plugins/dsh-git-manager
+git clone git@github.com:thqing/dsh-git-manager.git ~/dsh-plugins/dsh-git-manager
+#   然后让 Agent：plugin_manager install_bundle  target = ~/dsh-plugins/dsh-git-manager
+# 本机源码方式（直接指向本目录绝对路径）
+#   plugin_manager install_bundle   target = <本目录绝对路径>
 # 若提示 restart-required，退出并重开 DSH
 ```
 

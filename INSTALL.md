@@ -46,19 +46,21 @@
 
 ### 方式 A —— Git 仓库（**跨机器最推荐**）
 
+本插件仓库：`git@github.com:thqing/dsh-git-manager.git`
+
 ```bash
-git clone <你的仓库地址> ~/dsh-plugins/dsh-git-manager
+git clone git@github.com:thqing/dsh-git-manager.git ~/dsh-plugins/dsh-git-manager
 ```
 
 然后在本机 DSH 会话里让 Agent 执行：
 
 > `plugin_manager` → `install_bundle`，target 为 `~/dsh-plugins/dsh-git-manager` 的**绝对路径**
 
-也可以把仓库推到自己的远端后直接按 Git 地址装（连 clone 都不用手动做）：
+也可以不 clone，直接按 Git 地址安装：
 
-> `install_bundle`，target 为 `git+ssh://git@your-host/you/dsh-git-manager.git`
+> `install_bundle`，target 为 `git+ssh://git@github.com/thqing/dsh-git-manager.git`
 
-不绑定本地路径，卸载/重装都干净。
+不绑定本地路径，卸载/重装都干净；换电脑只需 `git clone` + 一次 `install_bundle`。
 
 ### 方式 B —— 源码目录（本机日常改代码时最方便）
 
