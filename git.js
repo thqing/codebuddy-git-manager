@@ -152,6 +152,25 @@ function assertRevision(value, label = 'revision') {
   return name
 }
 
+/**
+ * The remote a command should address.
+ *
+ * `git push`/`git pull` take `[<remote> [<branch>]]`, so a branch name passed
+ * without a remote is read as the repository and git answers with the confusing
+ * "does not appear to be a git repository". Resolve the position explicitly.
+ */
+async function resolveRemote(repo, branch, given) {
+  if (typeof given === 'string' && given.trim() !== '') return assertNotOption(given, '远程仓库')
+  if (branch) {
+    // assertRefName already rejected every character that could break the key.
+    const tracking = firstLine(await git(repo, ['config', '--get', `branch.${branch}.remote`]).catch(() => ''))
+    if (tracking) return tracking
+  }
+  const list = await remotes(repo)
+  if (list.length > 0) return list[0].name
+  return 'origin'
+}
+
 /** Reject a value that would be interpreted as an option. */
 function assertNotOption(value, label) {
   if (typeof value !== 'string' || value.trim() === '') throw new GitError(`缺少 ${label}`)
@@ -975,22 +994,32 @@ export async function dispatch(request, deps) {
       return mutation(repo, args, '获取失败', { timeout: config.networkTimeoutMs, long: true })
     }
     case 'pull': {
+      const branch = typeof payload.branch === 'string' && payload.branch.trim() !== ''
+        ? assertRefName(payload.branch, '分支名')
+        : null
       const args = ['pull', '--no-edit']
       if (asBoolean(payload.rebase)) args.push('--rebase')
       if (asBoolean(payload.ffOnly)) args.push('--ff-only')
-      if (typeof payload.remote === 'string' && payload.remote.trim() !== '') args.push(assertNotOption(payload.remote, '远程仓库'))
-      if (typeof payload.branch === 'string' && payload.branch.trim() !== '') args.push(assertRefName(payload.branch, '分支名'))
+      // Same positional hazard as push: a branch may never occupy the remote slot.
+      if (branch || (typeof payload.remote === 'string' && payload.remote.trim() !== '')) {
+        args.push(await resolveRemote(repo, branch, payload.remote))
+      }
+      if (branch) args.push(branch)
       return mutation(repo, args, '拉取失败', { timeout: config.networkTimeoutMs, long: true })
     }
     case 'push': {
+      const requested = typeof payload.branch === 'string' && payload.branch.trim() !== ''
+        ? assertRefName(payload.branch, '分支名')
+        : null
+      const current = requested ?? firstLine(await git(repo, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => '')) ?? null
+      const remote = await resolveRemote(repo, requested, payload.remote)
       const args = ['push']
-      if (asBoolean(payload.setUpstream)) args.push('--set-upstream')
+      // `-u` needs a refspec, so it is only passed when the branch is known.
+      if (asBoolean(payload.setUpstream) && current) args.push('--set-upstream')
       if (asBoolean(payload.force)) args.push('--force-with-lease')
       if (asBoolean(payload.tags)) args.push('--tags')
-      if (typeof payload.remote === 'string' && payload.remote.trim() !== '') args.push(assertNotOption(payload.remote, '远程仓库'))
-      if (typeof payload.branch === 'string' && payload.branch.trim() !== '') {
-        args.push(assertRefName(payload.branch, '分支名'))
-      }
+      args.push(remote)
+      if (requested) args.push(requested)
       return mutation(repo, args, '推送失败', { timeout: config.networkTimeoutMs, long: true })
     }
     case 'deleteRemoteBranch': {

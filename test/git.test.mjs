@@ -444,3 +444,66 @@ test('the preview reports the net change and flags a self-cancelling range', asy
   assert.equal((await fsp.readFile(path.join(root, 'flip.txt'), 'utf8')).trim(), 'active: dev')
   await runGit(root, ['checkout', '-q', 'main'])
 })
+
+test('push treats a branch-only payload as a branch, not as the repository', async () => {
+  // A local bare repo stands in for the remote, so this stays offline.
+  const bare = await fsp.mkdtemp(path.join(os.tmpdir(), 'dsh-git-bare-'))
+  await runGit(bare, ['init', '--bare', '-q'])
+  const branch = `push-${Date.now()}`
+  await runGit(root, ['checkout', '-q', '-b', branch])
+  await write('push-me.txt', 'content\n')
+  await runGit(root, ['add', '--all'])
+  await runGit(root, ['commit', '-q', '-m', 'push me'])
+  await runGit(root, ['remote', 'add', 'origin', bare])
+  try {
+    // This is exactly what the panel's toolbar sends: a branch and no remote.
+    // Before the fix the engine built `git push <branch>` and git answered
+    // "fatal: '<branch>' does not appear to be a git repository".
+    const result = await dispatch({ op: 'push', repo: root, branch, setUpstream: true }, { config })
+    assert.equal(typeof result.output, 'string')
+    assert.equal(
+      (await runGit(bare, ['rev-parse', `refs/heads/${branch}`])).stdout.trim(),
+      (await runGit(root, ['rev-parse', branch])).stdout.trim(),
+      'the bare remote received the branch',
+    )
+    assert.equal((await runGit(root, ['config', '--get', `branch.${branch}.remote`])).stdout.trim(), 'origin')
+    assert.equal((await runGit(root, ['config', '--get', `branch.${branch}.merge`])).stdout.trim(), `refs/heads/${branch}`)
+
+    // A remote-only payload keeps working (it pushes the current branch).
+    const remoteOnly = await dispatch({ op: 'push', repo: root, remote: 'origin' }, { config })
+    assert.equal(typeof remoteOnly.output, 'string')
+
+    // Pull has the same positional rule: a branch must never take the remote slot.
+    const pulled = await dispatch({ op: 'pull', repo: root, branch }, { config })
+    assert.equal(typeof pulled.output, 'string')
+  } finally {
+    await runGit(root, ['remote', 'remove', 'origin']).catch(() => {})
+    await runGit(root, ['checkout', '-q', 'main']).catch(() => {})
+    await fsp.rm(bare, { recursive: true, force: true })
+  }
+})
+
+test('push falls back to the only configured remote when none is given', async () => {
+  const bare = await fsp.mkdtemp(path.join(os.tmpdir(), 'dsh-git-bare2-'))
+  await runGit(bare, ['init', '--bare', '-q'])
+  const branch = `push2-${Date.now()}`
+  await runGit(root, ['checkout', '-q', '-b', branch])
+  await write('push2.txt', 'x\n')
+  await runGit(root, ['add', '--all'])
+  await runGit(root, ['commit', '-q', '-m', 'second push'])
+  await runGit(root, ['remote', 'add', 'upstream-of-mine', bare])
+  try {
+    // No remote in the payload and no tracking config: the single remote wins
+    // instead of the branch landing in the remote position.
+    const result = await dispatch({ op: 'push', repo: root, branch }, { config })
+    assert.equal(typeof result.output, 'string')
+    assert.equal(
+      (await runGit(bare, ['rev-parse', `refs/heads/${branch}`])).stdout.trim(),
+      (await runGit(root, ['rev-parse', branch])).stdout.trim(),
+    )
+  } finally {
+    await runGit(root, ['remote', 'remove', 'upstream-of-mine']).catch(() => {})
+    await runGit(root, ['checkout', '-q', 'main']).catch(() => {})
+    await fsp.rm(bare, { recursive: true, force: true })
+  }
+})

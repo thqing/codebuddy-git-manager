@@ -1197,6 +1197,13 @@ window.__ModuleLoader__.load({
         void loadCommit(commit.hash, true)
       }, [visibleRows, selection, loadCommit])
 
+      /** The remote the toolbar and branch actions should address. */
+      const pushRemote = useMemo(() => {
+        const upstream = snapshot?.status?.upstream
+        if (typeof upstream === 'string' && upstream.includes('/')) return upstream.split('/')[0]
+        return snapshot?.remotes?.[0]?.name ?? 'origin'
+      }, [snapshot])
+
       const clearSelection = useCallback(() => {
         setSelection(null)
         setDetail(null)
@@ -1411,7 +1418,15 @@ window.__ModuleLoader__.load({
         items.push({ separator: true })
         items.push({ label: tText('menu.copyName'), onSelect: () => copyText(branch.name) })
         if (!isRemote) {
-          items.push({ label: tText('menu.push'), onSelect: () => void run({ op: 'push', branch: branch.name, setUpstream: !branch.upstream }, { label: tText('menu.push') }) })
+          items.push({
+            label: tText('menu.push'),
+            onSelect: () => void run({
+              op: 'push',
+              remote: branch.upstream ? branch.upstream.split('/')[0] : pushRemote,
+              branch: branch.name,
+              setUpstream: !branch.upstream,
+            }, { label: tText('menu.push') }),
+          })
           items.push({ label: tText('menu.rename'), onSelect: () => void (async () => {
             const result = await askText({ title: tText('dialog.rename.title'), label: tText('dialog.rename.name'), value: branch.name })
             if (result && result.value.trim()) await run({ op: 'renameBranch', from: branch.name, to: result.value.trim() })
@@ -1570,7 +1585,12 @@ window.__ModuleLoader__.load({
           ghost: true,
           disabled: !repoPath || Boolean(busy),
           title: t('action.push'),
-          onClick: () => void run({ op: 'push', setUpstream: !status?.upstream, branch: status?.branch ?? undefined }, { label: t('action.push') }),
+          onClick: () => void run({
+            op: 'push',
+            remote: pushRemote,
+            setUpstream: !status?.upstream,
+            branch: status?.branch ?? undefined,
+          }, { label: t('action.push') }),
           children: t('action.push'),
         }),
         h(Button, { key: 'branch', small: true, ghost: true, disabled: !repoPath, onClick: () => void newBranch(undefined, ''), children: t('action.newBranch') }),
@@ -2218,7 +2238,7 @@ window.__ModuleLoader__.load({
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
           id: PANEL_ID,
-          order: 8,
+          order: 7,
           label: () => t('panel.title'),
         }, GitIcon))
         ctx.slots.inject('main', () => ctx.slots.register({

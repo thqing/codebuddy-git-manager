@@ -192,7 +192,7 @@ test('the bundle registers a sidebar icon and the git main panel', () => {
   const main = registrations.find((entry) => entry.options.name === 'main')
   assert.equal(icon.options.id, 'git')
   assert.equal(typeof icon.options.label, 'function')
-  assert.equal(icon.options.order, 8)
+  assert.equal(icon.options.order, 7)
   assert.equal(main.options.key, 'git')
   assert.equal(typeof icon.component, 'function')
   assert.equal(typeof main.component, 'function')
