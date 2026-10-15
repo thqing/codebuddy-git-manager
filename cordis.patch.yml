@@ -1,0 +1,14 @@
+# Workspace bundle patch for the local profile: inserts the Git manager rows.
+# The Client half registers the sidebar icon and the `git` main panel.
+- insert:
+    - id: dsh-git-manager
+      name: '@local/dsh-git-manager'
+      config:
+        # Extra repositories shown in the panel beyond the registered workspaces.
+        repos: []
+        # Commit page size requested by the Client when it loads the graph.
+        maxCommits: 400
+        # Timeout for local git plumbing, in milliseconds.
+        timeoutMs: 60000
+        # Timeout for network operations (fetch/pull/push), in milliseconds.
+        networkTimeoutMs: 180000

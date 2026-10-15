@@ -1,0 +1,53 @@
+{
+  "name": "@local/dsh-git-manager",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Git 管理工具窗口：Local/Remote 分支树、提交图与图形化 Git 操作。",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./git": "./git.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "icon": "./icon.svg",
+  "meta": {
+    "title": "Git 管理",
+    "description": "Local/Remote 分支树、提交图与图形化 Git 操作（提交、暂存、拉取、推送、合并、变基等）。"
+  },
+  "files": [
+    "index.js",
+    "git.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "INSTALL.md",
+    "docs/",
+    "locale/",
+    "test/"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "dsh",
+    "cordis",
+    "plugin",
+    "git"
+  ]
+}
