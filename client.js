@@ -550,6 +550,11 @@ window.__ModuleLoader__.load({
   --dg-fill-hover:var(--dsw-alias-button-primary-hover,#3a3d45);
   --dg-danger:var(--dsw-alias-state-error-primary,#f54a45);
   --dg-success:var(--dsw-alias-state-success-primary,#34c724);
+  /* The checked-out branch is green, but the host green (green-500) is too light
+     to read as 13px text on the light theme's white panel. Mixing it toward the
+     theme's own label color yields a darker green on light and a brighter one on
+     dark, without a theme selector. */
+  --dg-current-ink:color-mix(in srgb,var(--dg-success) 62%,var(--dg-text));
   --dg-node-fill:var(--dsw-alias-bg-base,var(--dg-panel));
   --dg-radius:var(--dsw-radius-md,6px);
   color:var(--dg-text);font-size:13px;line-height:20px;background:var(--dg-bg);
@@ -585,14 +590,17 @@ window.__ModuleLoader__.load({
 .dg-row{display:flex;align-items:center;gap:6px;height:25px;padding:0 12px;cursor:default;border-radius:4px;margin:0 6px;white-space:nowrap}
 .dg-row:hover{background:var(--dg-hover)}
 .dg-row.dg-active{background:var(--dg-accent-soft)}
+/* The checked-out branch anchors the whole tree: bold, with a green name and
+   branch glyph. Colour alone carries it, so hover and selection keep the fill. */
 .dg-row.dg-current{font-weight:600}
 .dg-row.dg-folder{color:var(--dg-dim)}
 .dg-row .dg-name{overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.dg-row.dg-current .dg-name{color:var(--dg-current-ink)}
 .dg-row .dg-tag{color:var(--dg-faint);font-size:11px;font-variant-numeric:tabular-nums}
 .dg-indent{padding-left:22px}
 .dg-caret{width:12px;flex:none;color:var(--dg-faint);font-size:10px;text-align:center}
 .dg-glyph{display:inline-flex;flex:none;color:var(--dg-faint)}
-.dg-row.dg-current .dg-glyph{color:var(--dg-accent)}
+.dg-row.dg-current .dg-glyph{color:var(--dg-success)}
 .dg-row.dg-folder .dg-glyph{color:var(--dg-dim)}
 .dg-badge{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:3px;font-size:10.5px;
   border:.5px solid var(--dg-border-strong);color:var(--dg-dim);background:var(--dg-panel);white-space:nowrap}
@@ -639,6 +647,9 @@ window.__ModuleLoader__.load({
 .dg-stat-del{color:var(--dg-danger)}
 .dg-status{display:flex;align-items:center;gap:10px;padding:6px 14px;border-top:1px solid var(--dg-border);
   color:var(--dg-faint);font-size:11.5px;flex-wrap:wrap}
+/* Same green as the tree row, so the branch that HEAD points at is recognisable
+   in the status bar too. */
+.dg-status .dg-cur-branch{color:var(--dg-current-ink);font-weight:600}
 .dg-notice{display:flex;align-items:flex-start;gap:8px;margin:8px 12px;padding:8px 10px;border-radius:var(--dg-radius);
   background:var(--dg-panel-2);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .dg-notice.dg-error{background:color-mix(in srgb,var(--dg-danger) 14%,transparent);color:var(--dg-danger)}
@@ -2169,7 +2180,8 @@ window.__ModuleLoader__.load({
           status
             ? h('span', { key: 'branch' }, [
               '⑂ ',
-              status.detached ? t('status.detached') : (status.branch ?? t('status.detached')),
+              h('span', { key: 'name', className: status.detached ? undefined : 'dg-cur-branch' },
+                status.detached ? t('status.detached') : (status.branch ?? t('status.detached'))),
               status.ahead ? `  ↑${status.ahead}` : '',
               status.behind ? `  ↓${status.behind}` : '',
               status.upstream ? `  → ${status.upstream}` : '',
