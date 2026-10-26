@@ -598,7 +598,15 @@ window.__ModuleLoader__.load({
 .dg-row.dg-current .dg-name{color:var(--dg-current-ink)}
 .dg-row .dg-tag{color:var(--dg-faint);font-size:11px;font-variant-numeric:tabular-nums}
 .dg-indent{padding-left:22px}
-.dg-caret{width:12px;flex:none;color:var(--dg-faint);font-size:10px;text-align:center}
+/* The disclosure arrow is the only affordance separating a folder from a leaf,
+   so it needs real area: a 10px text triangle is illegible and ▾/▸ read alike.
+   One filled triangle rotates instead, which keeps both states obviously the
+   same control at a glance. */
+.dg-caret{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:none;
+  color:var(--dg-dim)}
+.dg-caret svg{transition:transform .12s ease}
+.dg-caret.dg-open svg{transform:rotate(90deg)}
+.dg-caret.dg-clickable:hover{color:var(--dg-text)}
 .dg-glyph{display:inline-flex;flex:none;color:var(--dg-faint)}
 .dg-row.dg-current .dg-glyph{color:var(--dg-success)}
 .dg-row.dg-folder .dg-glyph{color:var(--dg-dim)}
@@ -833,6 +841,21 @@ window.__ModuleLoader__.load({
         'aria-hidden': true,
         className: 'dg-glyph',
       }, paths.map((path, index) => h(path.circle ? 'circle' : 'path', { key: index, ...path })))
+    }
+
+    /** Disclosure triangle for the tree: points right when collapsed and is
+     *  rotated a quarter turn when open. Filled rather than stroked, because a
+     *  thin chevron is what made the two states look alike. */
+    function CaretGlyph() {
+      return h('svg', {
+        width: 14,
+        height: 14,
+        viewBox: '0 0 16 16',
+        fill: 'currentColor',
+        stroke: 'none',
+        'aria-hidden': true,
+        className: 'dg-chevron',
+      }, h('path', { d: 'M5.2 2.8 12.8 8 5.2 13.2z' }))
     }
 
     function FolderGlyph(props) {
@@ -1692,9 +1715,9 @@ window.__ModuleLoader__.load({
           options.caret !== undefined
             ? h('span', {
               key: 'caret',
-              className: 'dg-caret dg-clickable',
+              className: `dg-caret dg-clickable${options.caret ? ' dg-open' : ''}`,
               onClick: (event) => { event.stopPropagation(); options.onToggle?.() },
-            }, options.caret ? '▾' : '▸')
+            }, h(CaretGlyph))
             : h('span', { key: 'caret', className: 'dg-caret' }),
           options.icon ? h('span', { key: 'icon', className: 'dg-glyph' }, options.icon) : null,
           h('span', { key: 'name', className: 'dg-name' }, label),
@@ -1797,7 +1820,7 @@ window.__ModuleLoader__.load({
 
       const tree = h('aside', { className: 'dg-side' }, [
         h('div', { className: 'dg-section', key: 'h-local' }, [
-          h('span', { key: 'c', className: 'dg-caret dg-clickable', onClick: () => setCollapsed((c) => ({ ...c, local: !c.local })) }, collapsed.local ? '▸' : '▾'),
+          h('span', { key: 'c', className: `dg-caret dg-clickable${collapsed.local ? '' : ' dg-open'}`, onClick: () => setCollapsed((c) => ({ ...c, local: !c.local })) }, h(CaretGlyph)),
           t('tree.local'),
         ]),
         ...(collapsed.local
@@ -1807,7 +1830,7 @@ window.__ModuleLoader__.load({
             : [h('div', { className: 'dg-hint dg-indent', key: 'e' }, t('tree.empty'))])),
 
         h('div', { className: 'dg-section', key: 'h-remote' }, [
-          h('span', { key: 'c', className: 'dg-caret dg-clickable', onClick: () => setCollapsed((c) => ({ ...c, remote: !c.remote })) }, collapsed.remote ? '▸' : '▾'),
+          h('span', { key: 'c', className: `dg-caret dg-clickable${collapsed.remote ? '' : ' dg-open'}`, onClick: () => setCollapsed((c) => ({ ...c, remote: !c.remote })) }, h(CaretGlyph)),
           t('tree.remote'),
         ]),
         ...(collapsed.remote
@@ -1840,13 +1863,13 @@ window.__ModuleLoader__.load({
             : [h('div', { className: 'dg-hint dg-indent', key: 'e' }, t('tree.empty'))])),
 
         h('div', { className: 'dg-section', key: 'h-tags' }, [
-          h('span', { key: 'c', className: 'dg-caret dg-clickable', onClick: () => setCollapsed((c) => ({ ...c, tags: !c.tags })) }, collapsed.tags ? '▸' : '▾'),
+          h('span', { key: 'c', className: `dg-caret dg-clickable${collapsed.tags ? '' : ' dg-open'}`, onClick: () => setCollapsed((c) => ({ ...c, tags: !c.tags })) }, h(CaretGlyph)),
           `${t('tree.tags')}（${branchTree?.tags?.length ?? 0}）`,
         ]),
         ...(collapsed.tags ? [] : renderTree(tagTree, 0, 'tags', tagRow)),
 
         h('div', { className: 'dg-section', key: 'h-stash' }, [
-          h('span', { key: 'c', className: 'dg-caret dg-clickable', onClick: () => setCollapsed((c) => ({ ...c, stash: !c.stash })) }, collapsed.stash ? '▸' : '▾'),
+          h('span', { key: 'c', className: `dg-caret dg-clickable${collapsed.stash ? '' : ' dg-open'}`, onClick: () => setCollapsed((c) => ({ ...c, stash: !c.stash })) }, h(CaretGlyph)),
           `${t('tree.stashes')}（${snapshot?.stashes?.length ?? 0}）`,
         ]),
         ...(collapsed.stash ? [] : (snapshot?.stashes ?? []).map((stash) => treeRow(`s-${stash.index}`, stash.subject || stash.selector, {
@@ -1858,7 +1881,7 @@ window.__ModuleLoader__.load({
         }))),
 
         h('div', { className: 'dg-section', key: 'h-remotes' }, [
-          h('span', { key: 'c', className: 'dg-caret dg-clickable', onClick: () => setCollapsed((c) => ({ ...c, remotes: !c.remotes })) }, collapsed.remotes ? '▸' : '▾'),
+          h('span', { key: 'c', className: `dg-caret dg-clickable${collapsed.remotes ? '' : ' dg-open'}`, onClick: () => setCollapsed((c) => ({ ...c, remotes: !c.remotes })) }, h(CaretGlyph)),
           t('tree.remotes'),
         ]),
         ...(collapsed.remotes ? [] : (snapshot?.remotes ?? []).map((remote) => treeRow(`rm-${remote.name}`, remote.name, {
