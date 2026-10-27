@@ -38,7 +38,7 @@
 **图形化操作**
 | 位置 | 操作 |
 | --- | --- |
-| 工具栏 | 刷新、获取、拉取、推送、新建分支、更多（暂存修改 / 弹出暂存 / 获取并清理 / 合并 / 变基 / 中止合并 / 中止变基 / 提交身份 / 添加远程） |
+| 工具栏 | 刷新、获取、**更新项目**（<kbd>⌘/Ctrl</kbd>+<kbd>T</kbd>）、推送、新建分支、更多（更新项目（总是询问）/ 拉取 / 暂存修改 / 弹出暂存 / 获取并清理 / 合并 / 变基 / 中止合并 / 中止变基 / 提交身份 / 添加远程） |
 | 本地分支右键 | 检出、从此新建分支、合并到当前分支、变基当前分支到此、推送、重命名、创建标签、删除、复制名称 |
 | 远程分支右键 | 检出、新建本地分支、合并、变基、删除远程分支、复制名称 |
 | 提交右键（单选） | 检出（分离头指针）、从此新建分支、创建标签、摘取、回滚、重置（soft/mixed/hard）、复制 hash/信息 |
@@ -50,7 +50,26 @@
 插件同时注册 `git_manage` 工具，UI 与模型共用同一套 Host 实现
 （`action` 取值：`status`、`branches`、`log`、`diff`、`stage`、`unstage`、`commit_staged`、
 `checkout`、`create_branch`、`merge`、`rebase`、`revert`、`reset`、`cherry_pick`、
-`stash_push`、`stash_pop`、`stash_list`、`create_tag`、`remotes`、`discover` 等）。
+`stash_push`、`stash_pop`、`stash_list`、`create_tag`、`remotes`、`discover`、
+`update_project`（`strategy`：`merge` / `rebase` / `reset`）等）。
+
+## 更新项目（Update Project）
+
+IDEA 里对着迁出分支按 <kbd>Ctrl</kbd>+<kbd>T</kbd> 弹出的那个窗口，在这里叫**更新项目**：先 `git fetch`，
+再把远端的新提交整合进当前分支。工具栏按钮显示未拉取提交数（如 `更新项目 ↓3`），快捷键
+<kbd>⌘</kbd>+<kbd>T</kbd> / <kbd>Ctrl</kbd>+<kbd>T</kbd> 打开同一个对话框（浏览器通常把 Ctrl+T 留给新标签页，
+所以快捷键只在焦点位于本面板内时生效，按钮与「更多」菜单始终可用）。
+
+- **两种整合方式**：`merge`（把远端的新提交合并到当前分支，默认）/ `rebase`（把当前分支变基到远端的新提交之上），
+  与 IDEA 的两个单选项一致；勾选「记住我的选择，以后不再询问」后，下次点工具栏按钮直接执行，不再弹窗
+  （存在 `localStorage` 的 `dsh-git-manager.updateStrategy`），「更多 → 更新项目」则总是询问。
+- **重置到远程分支**：对话框左下角的破坏性操作，会把当前分支 `git reset --hard` 到上游，二次确认里写明
+  「本地未推送的提交和未提交的改动都会丢失」。
+- 上游解析与 `pull` 一致：优先 `@{upstream}`，没有配置跟踪分支时回退到 `<remote>/<branch>`，都没有则明确报错
+  「当前分支 X 在远端 Y 上没有对应分支，无法更新」；分离头指针直接拒绝。
+- 已经是最新时不会产生空合并提交，只提示「已经是最新的（origin/xxx）」。
+- 与 `拉取（pull）` 的区别：pull 直接用 `git pull`（可带 `--rebase` / `--ff-only`），是「一条命令跑到底」；
+  更新项目是自己 `fetch` + 自己选策略，会先把 behind/ahead 数算出来再决定要不要动历史，行为更可控。
 
 ## 多选与 Squash Commits
 

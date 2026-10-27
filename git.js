@@ -171,6 +171,27 @@ async function resolveRemote(repo, branch, given) {
   return 'origin'
 }
 
+/**
+ * The remote-tracking ref a local branch integrates from.
+ *
+ * A branch that was pushed with `-u` records its upstream; a clone that only
+ * checked out part of the work may not, so fall back to `<remote>/<branch>` and
+ * prove the ref exists before handing it to `git merge`.
+ */
+async function upstreamRef(repo, branch, remote) {
+  const configured = firstLine(await git(
+    repo,
+    ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branch}@{upstream}`],
+  ).catch(() => ''))
+  if (configured) return configured
+  const candidate = `${remote}/${branch}`
+  const probe = await runGit(repo, ['rev-parse', '--verify', '--quiet', `refs/remotes/${candidate}`], { allowFailure: true })
+  if (probe.code !== 0) {
+    throw new GitError(`当前分支 ${branch} 在远端 ${remote} 上没有对应分支，无法更新`)
+  }
+  return candidate
+}
+
 /** Reject a value that would be interpreted as an option. */
 function assertNotOption(value, label) {
   if (typeof value !== 'string' || value.trim() === '') throw new GitError(`缺少 ${label}`)
@@ -798,7 +819,7 @@ export async function dispatch(request, deps) {
   if (op === 'capabilities') {
     // The panel probes this to decide whether the running Host generation
     // implements the newest operations (a Host module only reloads on restart).
-    return { engine: 2, ops: ['snapshot', 'squash', 'squashPreview', 'capabilities'] }
+    return { engine: 3, ops: ['snapshot', 'squash', 'squashPreview', 'updateProject', 'capabilities'] }
   }
   if (op === 'version') {
     const stdout = await git(process.cwd(), ['--version']).catch(() => 'git')
@@ -1006,6 +1027,28 @@ export async function dispatch(request, deps) {
       }
       if (branch) args.push(branch)
       return mutation(repo, args, '拉取失败', { timeout: config.networkTimeoutMs, long: true })
+    }
+    case 'updateProject': {
+      const strategy = ['merge', 'rebase', 'reset'].includes(payload.strategy) ? payload.strategy : 'merge'
+      const head = await currentBranch(repo)
+      if (!head.branch) throw new GitError('当前是分离头指针，无法更新分支')
+      const remote = await resolveRemote(repo, head.branch, payload.remote)
+      // Fetch first: the counts below only describe the remote once its refs are
+      // current, and the dialog promises to say how many commits are incoming.
+      await mutation(repo, ['fetch', remote], '获取失败', { timeout: config.networkTimeoutMs })
+      const upstream = await upstreamRef(repo, head.branch, remote)
+      const counts = await git(repo, ['rev-list', '--left-right', '--count', `${upstream}...HEAD`])
+      const [behind, ahead] = counts.trim().split(/\s+/).map((value) => Number(value) || 0)
+      const base = { branch: head.branch, remote, upstream, strategy, ahead, behind }
+      if (behind === 0) return { ...base, updated: false, output: '', summary: await repoSummary(repo) }
+      const args = strategy === 'reset'
+        ? ['reset', '--hard', upstream]
+        : strategy === 'rebase'
+          ? ['rebase', upstream]
+          : ['merge', '--no-edit', upstream]
+      const failure = strategy === 'reset' ? '重置失败' : strategy === 'rebase' ? '变基失败' : '合并失败'
+      const result = await mutation(repo, args, failure)
+      return { ...base, updated: true, output: result.output, summary: await repoSummary(repo) }
     }
     case 'push': {
       const requested = typeof payload.branch === 'string' && payload.branch.trim() !== ''

@@ -19,6 +19,8 @@ window.__ModuleLoader__.load({
     const API_PATH = '/api/dsh-git'
     const REPO_KEY = 'dsh-git-manager.repo'
     const EXTRA_KEY = 'dsh-git-manager.extraRepos'
+    /** Remembered "update project" strategy: merge | rebase | reset. */
+    const UPDATE_KEY = 'dsh-git-manager.updateStrategy'
     const MAX_COMMITS = 400
 
     // ---------------------------------------------------------------- locale
@@ -43,6 +45,22 @@ window.__ModuleLoader__.load({
       'action.cancel': '取消',
       'action.confirm': '确定',
       'action.copy': '复制',
+      'action.update': '更新项目',
+      'action.updateTitle': '更新项目（Ctrl+T）：获取远程分支，把远端的新提交合并或变基到当前分支',
+      'action.updateRestart': '宿主尚未实现该操作，重启 DSH 后可用',
+      'dialog.update.title': '更新项目',
+      'dialog.update.text': '当前分支 {branch}，跟踪 {upstream}。',
+      'dialog.update.textNoUpstream': '当前分支 {branch} 还没有跟踪的远程分支。',
+      'dialog.update.merge': '把远端的新提交合并到当前分支',
+      'dialog.update.rebase': '把当前分支变基到远端的新提交之上',
+      'dialog.update.remember': '记住我的选择，以后不再询问',
+      'dialog.update.reset': '重置到远程分支',
+      'dialog.update.resetConfirm': '把 {branch} 硬重置到 {upstream}？\n本地未推送的提交和未提交的改动都会丢失。',
+      'dialog.update.upToDate': '已经是最新的（{upstream}）',
+      'dialog.update.done': '已把 {upstream} 的 {count} 个提交{verb}到 {branch}',
+      'verb.merge': '合并',
+      'verb.rebase': '变基',
+      'verb.reset': '重置',
       'repo.none': '没有找到 Git 仓库',
       'repo.noneHint': '添加一个仓库目录，或在此目录执行 git init。',
       'repo.path': '仓库路径',
@@ -184,6 +202,22 @@ window.__ModuleLoader__.load({
       'action.cancel': 'Cancel',
       'action.confirm': 'OK',
       'action.copy': 'Copy',
+      'action.update': 'Update Project',
+      'action.updateTitle': 'Update Project (Ctrl+T): fetch the remote and merge or rebase its new commits into this branch',
+      'action.updateRestart': 'The Host does not implement this yet; restart DSH',
+      'dialog.update.title': 'Update Project',
+      'dialog.update.text': 'Current branch {branch}, tracking {upstream}.',
+      'dialog.update.textNoUpstream': 'Current branch {branch} has no tracked remote branch yet.',
+      'dialog.update.merge': 'Merge incoming changes into the current branch',
+      'dialog.update.rebase': 'Rebase the current branch on top of incoming changes',
+      'dialog.update.remember': "Don't ask again: remember this choice",
+      'dialog.update.reset': 'Reset to the Remote Branch',
+      'dialog.update.resetConfirm': 'Hard reset {branch} to {upstream}?\nUnpushed commits and uncommitted changes will be lost.',
+      'dialog.update.upToDate': 'Already up to date ({upstream})',
+      'dialog.update.done': '{verb} {count} commit(s) from {upstream} into {branch}',
+      'verb.merge': 'Merged',
+      'verb.rebase': 'Rebased',
+      'verb.reset': 'Reset',
       'repo.none': 'No Git repository found',
       'repo.noneHint': 'Add a repository directory, or run git init in one.',
       'repo.path': 'Repository path',
@@ -671,6 +705,16 @@ window.__ModuleLoader__.load({
 .dg-dialog-body{padding:0 16px 8px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 .dg-dialog-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px}
 .dg-field{display:flex;flex-direction:column;gap:5px}
+.dg-choices{display:flex;flex-direction:column;gap:2px}
+.dg-choice{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--dg-radius);
+  cursor:pointer;font-size:12.5px;line-height:17px}
+.dg-choice:hover{background:var(--dg-hover)}
+.dg-choice input{flex:none;margin:0}
+.dg-choice-check{display:flex;align-items:center;gap:7px;margin-top:4px;color:var(--dg-text);
+  font-size:12px;cursor:pointer}
+.dg-choice-check input{flex:none;margin:0}
+/* The dialog's one explaining sentence is body copy, not a dim hint. */
+.dg-dialog .dg-hint{color:var(--dg-text)}
 .dg-menu{position:fixed;z-index:1400;min-width:198px;max-height:60vh;overflow:auto;padding:5px;
   background:var(--dsw-alias-bg-overlay,var(--dg-panel-2));border-radius:var(--dsw-radius-lg,10px);
   box-shadow:var(--dsw-elevation-prominent,0 10px 32px rgba(0,0,0,.28));color:var(--dg-text)}
@@ -729,6 +773,9 @@ window.__ModuleLoader__.load({
           } else if (event.key === 'Enter' && dialog.multiline === true && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
             props.onClose(value)
+          } else if (event.key === 'Enter' && dialog.kind === 'choice') {
+            event.preventDefault()
+            props.onClose(dialog.checkedLabel ? { value, checked } : { value })
           }
         }
         document.addEventListener('keydown', onKey, true)
@@ -761,10 +808,33 @@ window.__ModuleLoader__.load({
             h('input', { type: 'checkbox', checked, onChange: (event) => setChecked(event.target.checked) }),
             dialog.checkedLabel))
         }
+      } else if (dialog.kind === 'choice') {
+        if (dialog.text) fields.push(h('div', { key: 'm', className: 'dg-hint' }, dialog.text))
+        const options = Array.isArray(dialog.options) ? dialog.options : []
+        fields.push(h('div', { key: 'o', className: 'dg-choices' }, options.map((option) => h('label', {
+          key: option.value,
+          className: `dg-choice${value === option.value ? ' dg-on' : ''}`,
+        }, [
+          h('input', {
+            key: 'i',
+            type: 'radio',
+            name: 'dg-choice',
+            checked: value === option.value,
+            onChange: () => setValue(option.value),
+          }),
+          h('span', { key: 'l' }, option.label),
+        ]))))
+        if (dialog.checkedLabel) {
+          fields.push(h('label', { key: 'c', className: 'dg-choice-check' }, [
+            h('input', { key: 'i', type: 'checkbox', checked, onChange: (event) => setChecked(event.target.checked) }),
+            h('span', { key: 'l' }, dialog.checkedLabel),
+          ]))
+        }
       } else {
         fields.push(h('div', { key: 'm', style: { whiteSpace: 'pre-wrap' } }, dialog.text))
       }
-      const readValue = () => (dialog.kind === 'text' ? { value, checked } : true)
+      const readValue = () => (dialog.kind === 'text' || dialog.kind === 'choice' ? { value, checked } : true)
+      const extra = dialog.footExtra
       return h('div', {
         className: 'dg-overlay',
         onMouseDown: (event) => {
@@ -777,6 +847,16 @@ window.__ModuleLoader__.load({
           dialog.extra ? dialog.extra({ value, setValue }) : null,
         ]),
         h('div', { className: 'dg-dialog-foot' }, [
+          extra
+            ? h(Button, {
+              key: 'x',
+              ghost: true,
+              danger: extra.danger === true,
+              onClick: () => props.onClose({ ...readValue(), action: 'extra' }),
+              children: extra.label,
+            })
+            : null,
+          extra ? h('div', { key: 'sp', className: 'dg-spacer' }) : null,
           h(Button, { key: 'c', onClick: () => props.onClose(null), children: props.t('action.cancel') }),
           h(Button, {
             key: 'o',
@@ -1015,9 +1095,11 @@ window.__ModuleLoader__.load({
       const [dialog, setDialog] = useState(null)
       const [repoError, setRepoError] = useState(null)
       const [supportsSquash, setSupportsSquash] = useState(false)
+      const [supportsUpdate, setSupportsUpdate] = useState(null)
       const dialogResolver = useRef(null)
       const snapshotRef = useRef(null)
       const mountedRef = useRef(true)
+      const rootRef = useRef(null)
 
       useEffect(() => {
         mountedRef.current = true
@@ -1039,10 +1121,13 @@ window.__ModuleLoader__.load({
         void (async () => {
           try {
             const caps = await call({ op: 'capabilities' })
-            if (alive) setSupportsSquash(Array.isArray(caps?.ops) && caps.ops.includes('squash'))
+            const ops = Array.isArray(caps?.ops) ? caps.ops : []
+            if (alive) setSupportsSquash(ops.includes('squash'))
+            if (alive) setSupportsUpdate(ops.includes('updateProject'))
           } catch {
             // An older Host answers `未知操作`; history rewrite stays hidden.
             if (alive) setSupportsSquash(false)
+            // Unknown stays null: the panel keeps trying and lets the Host answer.
           }
         })()
         return () => { alive = false }
@@ -1151,6 +1236,97 @@ window.__ModuleLoader__.load({
       }).then((value) => value !== null), [ask, tText])
 
       const showError = useCallback((error) => setNotice({ kind: 'error', text: error.message ?? String(error) }), [])
+
+      // -------------------------------------------------------- update project
+
+      /** Apply one remembered strategy, or ask the way IDEA's dialog does. */
+      const runUpdate = useCallback(async (strategy, label) => {
+        const data = await run({ op: 'updateProject', strategy }, { label, silent: true })
+        if (!data || !mountedRef.current) return data
+        if (data.updated === false) {
+          setNotice({ kind: 'ok', text: tText('dialog.update.upToDate', { upstream: data.upstream }) })
+        } else {
+          setNotice({
+            kind: 'ok',
+            text: tText('dialog.update.done', {
+              upstream: data.upstream,
+              count: data.behind,
+              branch: data.branch,
+              verb: tText(`verb.${data.strategy}`),
+            }),
+          })
+        }
+        return data
+      }, [run, tText])
+
+      const resetToRemote = useCallback(async () => {
+        const current = snapshotRef.current?.status
+        const branch = current?.branch ?? ''
+        const upstream = current?.upstream ?? branch
+        const ok = await askConfirm(
+          tText('dialog.update.resetConfirm', { branch, upstream }),
+          tText('dialog.update.reset'),
+        )
+        if (!ok) return
+        await runUpdate('reset', tText('dialog.update.reset'))
+      }, [askConfirm, runUpdate, tText])
+
+      const openUpdate = useCallback(async (forceDialog = false) => {
+        if (!repoPath || busy) return
+        if (supportsUpdate === false) {
+          setNotice({ kind: 'error', text: t('action.updateRestart') })
+          return
+        }
+        const current = snapshotRef.current?.status
+        const remembered = globalThis.localStorage?.getItem(UPDATE_KEY)
+        const known = remembered === 'merge' || remembered === 'rebase' || remembered === 'reset'
+        if (known && !forceDialog) {
+          await runUpdate(remembered, t('action.update'))
+          return
+        }
+        const answer = await ask({
+          kind: 'choice',
+          title: tText('dialog.update.title'),
+          text: current?.upstream
+            ? tText('dialog.update.text', { branch: current.branch ?? '', upstream: current.upstream })
+            : tText('dialog.update.textNoUpstream', { branch: current?.branch ?? '' }),
+          value: known ? remembered : 'merge',
+          options: [
+            { value: 'merge', label: tText('dialog.update.merge') },
+            { value: 'rebase', label: tText('dialog.update.rebase') },
+          ],
+          checkedLabel: tText('dialog.update.remember'),
+          confirmText: t('action.update'),
+          footExtra: { label: tText('dialog.update.reset') },
+        })
+        if (!answer) return
+        if (answer.action === 'extra') {
+          await resetToRemote()
+          return
+        }
+        const chosen = answer.value === 'rebase' ? 'rebase' : 'merge'
+        if (answer.checked === true) globalThis.localStorage?.setItem(UPDATE_KEY, chosen)
+        else globalThis.localStorage?.removeItem(UPDATE_KEY)
+        await runUpdate(chosen, t('action.update'))
+      }, [ask, busy, repoPath, resetToRemote, runUpdate, supportsUpdate, t, tText])
+
+      // IDEA binds Ctrl+T to "update project". Browsers reserve it for a new tab,
+      // so the shortcut only fires while focus is inside this panel.
+      useEffect(() => {
+        const onKey = (event) => {
+          if (dialog || menu || busy || !repoPath) return
+          if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
+          if (String(event.key ?? '').toLowerCase() !== 't') return
+          const active = document.activeElement
+          const inside = !active || active === document.body
+            || (rootRef.current !== null && rootRef.current.contains(active))
+          if (!inside) return
+          event.preventDefault()
+          void openUpdate(true)
+        }
+        document.addEventListener('keydown', onKey, true)
+        return () => document.removeEventListener('keydown', onKey, true)
+      }, [busy, dialog, menu, openUpdate, repoPath])
 
       const status = snapshot?.status
       const branchTree = snapshot?.branches
@@ -1612,7 +1788,17 @@ window.__ModuleLoader__.load({
         ]),
         h(Button, { key: 'refresh', small: true, ghost: true, title: t('action.refresh'), onClick: () => void load(), children: t('action.refresh') }),
         h(Button, { key: 'fetch', small: true, ghost: true, disabled: !repoPath || Boolean(busy), onClick: () => void run({ op: 'fetch' }, { label: t('action.fetch') }), children: t('action.fetch') }),
-        h(Button, { key: 'pull', small: true, ghost: true, disabled: !repoPath || Boolean(busy), onClick: () => void run({ op: 'pull' }, { label: t('action.pull') }), children: t('action.pull') }),
+        h(Button, {
+          key: 'update',
+          small: true,
+          ghost: true,
+          disabled: !repoPath || Boolean(busy),
+          title: supportsUpdate === false
+            ? `${t('action.updateTitle')} · ${t('action.updateRestart')}`
+            : t('action.updateTitle'),
+          onClick: () => void openUpdate(false),
+          children: status?.behind ? `${t('action.update')} ↓${status.behind}` : t('action.update'),
+        }),
         h(Button, {
           key: 'push',
           small: true,
@@ -1655,6 +1841,9 @@ window.__ModuleLoader__.load({
                   await run({ op: 'stashPush', message: result.value, includeUntracked: result.checked === true })
                 })() },
                 { label: t('action.stashPop'), onSelect: () => void run({ op: 'stashPop' }) },
+                { separator: true },
+                { label: t('action.update'), onSelect: () => void openUpdate(true) },
+                { label: t('action.pull'), onSelect: () => void run({ op: 'pull' }, { label: t('action.pull') }) },
                 { separator: true },
                 { label: t('menu.fetchPrune'), onSelect: () => void run({ op: 'fetch', tags: true }, { label: t('menu.fetchPrune') }) },
                 { label: t('menu.merge'), onSelect: () => void (async () => {
@@ -2140,7 +2329,7 @@ window.__ModuleLoader__.load({
       // ------------------------------------------------------------ empty pane
 
       if (!repoPath) {
-        return h('div', { className: 'dg-root' }, [
+        return h('div', { className: 'dg-root', ref: rootRef }, [
           h('style', { key: 'css' }, CSS),
           toolbar,
           h('div', { className: 'dg-empty', key: 'empty' }, [
@@ -2153,7 +2342,7 @@ window.__ModuleLoader__.load({
 
       // --------------------------------------------------------------- panel
 
-      return h('div', { className: 'dg-root' }, [
+      return h('div', { className: 'dg-root', ref: rootRef }, [
         h('style', { key: 'css' }, CSS),
         toolbar,
         notice

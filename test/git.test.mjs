@@ -359,8 +359,9 @@ test('squash refuses what it cannot rewrite', async () => {
 
 test('capabilities names the new engine operations', async () => {
   const caps = await dispatch({ op: 'capabilities' }, { config })
-  assert.equal(caps.engine, 2)
+  assert.equal(caps.engine, 3)
   assert.ok(caps.ops.includes('squash'))
+  assert.ok(caps.ops.includes('updateProject'))
 })
 
 test('squash keeps HEAD attached to its branch and never dangles', async () => {
@@ -503,6 +504,120 @@ test('push falls back to the only configured remote when none is given', async (
     )
   } finally {
     await runGit(root, ['remote', 'remove', 'upstream-of-mine']).catch(() => {})
+    await runGit(root, ['checkout', '-q', 'main']).catch(() => {})
+    await fsp.rm(bare, { recursive: true, force: true })
+  }
+})
+
+test('updateProject integrates the upstream by merge, rebase or reset', async () => {
+  // A bare repository plus a second clone keeps this offline and realistic: the
+  // "teammate" pushes, and the panel then asks for an update.
+  const base = await fsp.mkdtemp(path.join(os.tmpdir(), 'dsh-git-update-'))
+  const bare = path.join(base, 'remote.git')
+  const work = path.join(base, 'work')
+  const peer = path.join(base, 'peer')
+  const out = async (dir, args) => (await runGit(dir, args)).stdout
+  const commitIn = async (dir, name, text, subject) => {
+    await fsp.writeFile(path.join(dir, name), text, 'utf8')
+    await runGit(dir, ['add', '--all'])
+    await runGit(dir, ['commit', '-q', '-m', subject])
+  }
+  try {
+    await fsp.mkdir(work, { recursive: true })
+    await runGit(base, ['init', '--bare', '-q', '-b', 'main', bare])
+    await runGit(work, ['init', '-q', '-b', 'main'])
+    for (const key of [['user.name', 'Tester'], ['user.email', 'tester@example.com'], ['commit.gpgsign', 'false']]) {
+      await runGit(work, ['config', ...key])
+    }
+    await commitIn(work, 'base.txt', 'base\n', 'base commit')
+    await runGit(work, ['remote', 'add', 'origin', bare])
+    await runGit(work, ['push', '-q', '-u', 'origin', 'main'])
+    await runGit(base, ['clone', '-q', bare, peer])
+    for (const key of [['user.name', 'Peer'], ['user.email', 'peer@example.com'], ['commit.gpgsign', 'false']]) {
+      await runGit(peer, ['config', ...key])
+    }
+    const peerPush = async (name, text, subject) => {
+      await commitIn(peer, name, text, subject)
+      await runGit(peer, ['push', '-q', 'origin', 'main'])
+    }
+
+    await peerPush('incoming1.txt', 'one\n', 'incoming one')
+    const merged = await dispatch({ op: 'updateProject', repo: work, strategy: 'merge' }, { config })
+    assert.equal(merged.updated, true)
+    assert.equal(merged.strategy, 'merge')
+    assert.equal(merged.branch, 'main')
+    assert.equal(merged.upstream, 'origin/main')
+    assert.equal(merged.behind, 1)
+    assert.equal(await fsp.readFile(path.join(work, 'incoming1.txt'), 'utf8'), 'one\n')
+
+    // A second call has nothing to integrate and must not invent a merge commit.
+    const again = await dispatch({ op: 'updateProject', repo: work, strategy: 'merge' }, { config })
+    assert.equal(again.updated, false)
+    assert.equal(again.behind, 0)
+
+    // Rebase: one local commit is replayed on top of the incoming one.
+    await commitIn(work, 'local.txt', 'local\n', 'local work')
+    await peerPush('incoming2.txt', 'two\n', 'incoming two')
+    const rebased = await dispatch({ op: 'updateProject', repo: work, strategy: 'rebase' }, { config })
+    assert.equal(rebased.updated, true)
+    assert.equal(rebased.behind, 1)
+    assert.equal(rebased.ahead, 1)
+    const replayed = (await out(work, ['log', '--format=%s', '-3'])).trim().split('\n')
+    assert.equal(replayed[0], 'local work', 'the local commit sits on top')
+    assert.equal(replayed[1], 'incoming two')
+    assert.equal(await fsp.readFile(path.join(work, 'incoming2.txt'), 'utf8'), 'two\n')
+
+    // Reset: the local commit is dropped and the branch follows the remote.
+    await commitIn(work, 'throwaway.txt', 'gone\n', 'throwaway')
+    await peerPush('incoming3.txt', 'three\n', 'incoming three')
+    const reset = await dispatch({ op: 'updateProject', repo: work, strategy: 'reset' }, { config })
+    assert.equal(reset.updated, true)
+    assert.equal(reset.strategy, 'reset')
+    assert.equal((await out(work, ['log', '--format=%s', '-1'])).trim(), 'incoming three')
+    await assert.rejects(fsp.stat(path.join(work, 'throwaway.txt')), 'the local commit was dropped')
+
+    // A detached HEAD is refused before any ref moves.
+    await runGit(work, ['checkout', '-q', '--detach'])
+    await assert.rejects(dispatch({ op: 'updateProject', repo: work }, { config }), /分离头指针/)
+    await runGit(work, ['checkout', '-q', 'main'])
+  } finally {
+    await fsp.rm(base, { recursive: true, force: true })
+  }
+})
+
+test('updateProject falls back to origin/<branch> when no upstream is configured', async () => {
+  const bare = await fsp.mkdtemp(path.join(os.tmpdir(), 'dsh-git-update2-'))
+  const branch = `update-${Date.now()}`
+  try {
+    await runGit(bare, ['init', '--bare', '-q', '-b', 'main'])
+    await runGit(root, ['checkout', '-q', '-b', branch])
+    await write('tracked.txt', 'v1\n')
+    await runGit(root, ['add', '--all'])
+    await runGit(root, ['commit', '-q', '-m', 'tracked base'])
+    await runGit(root, ['remote', 'add', 'origin', bare])
+    await runGit(root, ['push', '-q', 'origin', branch])
+    // Drop the tracking config a plain `git push` would leave behind.
+    await runGit(root, ['config', '--unset', `branch.${branch}.remote`]).catch(() => {})
+    await runGit(root, ['config', '--unset', `branch.${branch}.merge`]).catch(() => {})
+
+    const peer = path.join(bare, '..', `peer-${Date.now()}`)
+    await runGit(bare, ['clone', '-q', bare, peer])
+    await runGit(peer, ['config', 'user.name', 'Peer'])
+    await runGit(peer, ['config', 'user.email', 'peer@example.com'])
+    await runGit(peer, ['config', 'commit.gpgsign', 'false'])
+    await runGit(peer, ['checkout', '-q', branch])
+    await fsp.writeFile(path.join(peer, 'peer.txt'), 'peer\n', 'utf8')
+    await runGit(peer, ['add', '--all'])
+    await runGit(peer, ['commit', '-q', '-m', 'peer commit'])
+    await runGit(peer, ['push', '-q', 'origin', branch])
+
+    const result = await dispatch({ op: 'updateProject', repo: root, strategy: 'merge' }, { config })
+    assert.equal(result.updated, true)
+    assert.equal(result.upstream, `origin/${branch}`)
+    assert.equal(result.behind, 1)
+    await fsp.rm(peer, { recursive: true, force: true })
+  } finally {
+    await runGit(root, ['remote', 'remove', 'origin']).catch(() => {})
     await runGit(root, ['checkout', '-q', 'main']).catch(() => {})
     await fsp.rm(bare, { recursive: true, force: true })
   }

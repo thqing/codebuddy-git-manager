@@ -74,7 +74,7 @@ function loadBundle(initialStates, recorder, holder) {
 }
 
 /** Install the module into a fake Client context and return its registrations. */
-function install(moduleExports) {
+function install(moduleExports, { localeBind } = {}) {
   const registrations = []
   const injected = []
   const effects = []
@@ -87,7 +87,9 @@ function install(moduleExports) {
     logger: { warn: () => {} },
     locale: {
       register: () => () => {},
-      bind: () => (key) => key,
+      // Tests read locale keys by default; pass `localeBind` to exercise the
+      // bundle's own dictionary fallback instead.
+      bind: localeBind ?? (() => (key) => key),
     },
     slots: {
       inject(key, callback) {
@@ -814,6 +816,215 @@ test('the dialog derives the net change from a diff when the Host reports no sta
 
     const cancelled = await run('')
     assert.ok(cancelled.text.includes('dialog.squash.netEmpty'), 'an empty net change is flagged')
+  } finally {
+    delete globalThis.fetch
+  }
+})
+
+test('the toolbar offers 更新项目 where pull used to be, and pull moves into the menu', async () => {
+  const updates = []
+  const { registrations } = install(loadBundle(panelStates(), (index, next) => updates.push({ index, next })))
+  const tree = renderPanel(registrations)
+  const buttons = []
+  const collect = (element) => {
+    if (!element || typeof element !== 'object') return
+    if (Array.isArray(element)) {
+      element.forEach(collect)
+      return
+    }
+    if (element.$$element !== true) return
+    if (element.type === 'button') buttons.push(element)
+    element.children.forEach(collect)
+    // Inline components (Button, Menu triggers) render on invocation.
+    if (typeof element.type === 'function') collect(element.type(element.props))
+  }
+  collect(tree)
+  // Button passes its label through props.children, so read both places.
+  const labelOf = (button) => walk(button).text.join('')
+    + (typeof button.props.children === 'string' ? button.props.children : '')
+  const labels = buttons.map(labelOf)
+  assert.ok(labels.includes('action.update'), 'the toolbar grows an update-project button')
+  assert.equal(labels.includes('action.pull'), false, 'pull is no longer a top-level button')
+
+  // The More menu keeps pull reachable and repeats update for the dialog path.
+  const more = buttons.find((button) => labelOf(button).includes('action.more'))
+  assert.ok(more, 'the More button renders')
+  more.props.onClick({ stopPropagation() {}, currentTarget: { getBoundingClientRect: () => ({ left: 0, bottom: 0 }) } })
+  const items = updates.filter((entry) => entry.index === 18).pop().next.items
+  assert.ok(items.some((item) => item.label === 'action.update'))
+  assert.ok(items.some((item) => item.label === 'action.pull'))
+})
+
+test('更新项目 asks for a strategy, remembers it, and resets on demand', async () => {
+  const requests = []
+  let behind = 2
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body)
+    requests.push(body)
+    let data = SNAPSHOT
+    if (body.op === 'updateProject') {
+      data = {
+        branch: 'thq-dev', remote: 'origin', upstream: 'origin/thq-dev',
+        strategy: body.strategy, ahead: 0, behind, updated: behind > 0, output: '', summary: SNAPSHOT.summary,
+      }
+    }
+    return { ok: true, json: async () => ({ ok: true, data }) }
+  }
+  const store = {}
+  globalThis.localStorage = {
+    getItem: (key) => (key in store ? store[key] : null),
+    setItem: (key, value) => { store[key] = String(value) },
+    removeItem: (key) => { delete store[key] },
+  }
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+  const buttons = (tree) => {
+    const found = []
+    const collect = (element) => {
+      if (!element || typeof element !== 'object') return
+      if (Array.isArray(element)) { element.forEach(collect); return }
+      if (element.$$element !== true) return
+      if (element.type === 'button') {
+        found.push({
+          element,
+          text: walk(element).text.join('') + (typeof element.props.children === 'string' ? element.props.children : ''),
+        })
+      }
+      element.children.forEach(collect)
+      if (typeof element.type === 'function') collect(element.type(element.props))
+    }
+    collect(tree)
+    return found
+  }
+  try {
+    // `localeBind` makes the bundle fall back to its own dictionary, so this test
+    // sees the strings a user sees, placeholders and all.
+    const updates = []
+    const holder = { refs: [] }
+    const { registrations } = install(
+      loadBundle(panelStates(), (index, next) => updates.push({ index, next }), holder),
+      { localeBind: () => () => undefined },
+    )
+    // The shim consumes its state queue once, so every lookup reuses this tree.
+    const tree = renderPanel(registrations)
+    const find = (text) => buttons(tree).find((entry) => entry.text === text).element
+    const updateButton = find('更新项目')
+    const notice = () => updates.filter((entry) => entry.index === 5).pop()?.next
+
+    // In the panel the snapshot arrives on mount; the test triggers it by hand so
+    // the dialog can quote the branch and its upstream.
+    find('刷新').props.onClick()
+    await flush()
+    assert.deepEqual(requests.map((body) => body.op), ['snapshot'])
+    requests.length = 0
+
+    // 1) The first click asks, exactly like IDEA's dialog.
+    updateButton.props.onClick()
+    await flush()
+    const dialog = updates.filter((entry) => entry.index === 19).pop().next
+    assert.equal(dialog.kind, 'choice')
+    assert.equal(dialog.title, '更新项目')
+    assert.equal(dialog.value, 'merge', 'merge is IDEA’s default')
+    assert.deepEqual(dialog.options.map((option) => option.value), ['merge', 'rebase'])
+    assert.equal(dialog.options[0].label, '把远端的新提交合并到当前分支')
+    assert.equal(dialog.options[1].label, '把当前分支变基到远端的新提交之上')
+    assert.equal(dialog.checkedLabel, '记住我的选择，以后不再询问')
+    assert.equal(dialog.footExtra.label, '重置到远程分支')
+    assert.equal(dialog.confirmText, '更新项目')
+    // Nothing runs until the dialog is answered.
+    assert.deepEqual(requests, [])
+    assert.equal(dialog.text, '当前分支 thq-dev，跟踪 origin/thq-dev。')
+
+    assert.equal(typeof holder.refs[0].current, 'function', 'the dialog resolver is pending')
+    holder.refs[0].current({ value: 'rebase', checked: true })
+    await flush()
+    await flush()
+    assert.deepEqual(requests.map((body) => body.op), ['updateProject', 'snapshot'])
+    assert.equal(requests[0].strategy, 'rebase')
+    assert.equal(requests[0].repo, '/repo/plm')
+    assert.equal(store['dsh-git-manager.updateStrategy'], 'rebase', 'the choice is remembered')
+    assert.equal(notice().text, '已把 origin/thq-dev 的 2 个提交变基到 thq-dev')
+
+    // 2) The remembered strategy skips the dialog on the next click.
+    requests.length = 0
+    updates.length = 0
+    updateButton.props.onClick()
+    await flush()
+    await flush()
+    assert.equal(updates.some((entry) => entry.index === 19), false, 'no dialog the second time')
+    assert.deepEqual(requests.map((body) => body.op), ['updateProject', 'snapshot'])
+    assert.equal(requests[0].strategy, 'rebase')
+
+    // 3) Up to date: the notice says so instead of reporting a phantom update.
+    behind = 0
+    requests.length = 0
+    updates.length = 0
+    updateButton.props.onClick()
+    await flush()
+    await flush()
+    assert.equal(requests[0].op, 'updateProject')
+    assert.equal(notice().text, '已经是最新的（origin/thq-dev）')
+
+    // 4) The dialog's extra footer button resets, behind a danger confirm.
+    behind = 2
+    const more = buttons(tree).find((entry) => entry.text.includes('更多')).element
+    more.props.onClick({ stopPropagation() {}, currentTarget: { getBoundingClientRect: () => ({ left: 0, bottom: 0 }) } })
+    updates.filter((entry) => entry.index === 18).pop().next.items
+      .find((item) => item.label === '更新项目').onSelect()
+    await flush()
+    const second = updates.filter((entry) => entry.index === 19).pop().next
+    assert.equal(second.kind, 'choice', 'the menu path always asks, even when a strategy is remembered')
+    holder.refs[0].current({ value: 'merge', checked: false, action: 'extra' })
+    await flush()
+    const confirm = updates.filter((entry) => entry.index === 19).pop().next
+    assert.equal(confirm.kind, 'confirm')
+    assert.equal(confirm.danger, true)
+    assert.equal(confirm.text, '把 thq-dev 硬重置到 origin/thq-dev？\n本地未推送的提交和未提交的改动都会丢失。')
+    requests.length = 0
+    holder.refs[0].current(true)
+    await flush()
+    await flush()
+    assert.deepEqual(requests.map((body) => body.op), ['updateProject', 'snapshot'])
+    assert.equal(requests[0].strategy, 'reset')
+    assert.equal(notice().text, '已把 origin/thq-dev 的 2 个提交重置到 thq-dev')
+    assert.equal(store['dsh-git-manager.updateStrategy'], 'rebase', 'reset does not overwrite the remembered strategy')
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.localStorage
+  }
+})
+
+test('更新项目 tells the user to restart when the Host cannot update projects', async () => {
+  const requests = []
+  globalThis.fetch = async (url, init) => {
+    requests.push(JSON.parse(init.body))
+    return { ok: true, json: async () => ({ ok: true, data: SNAPSHOT }) }
+  }
+  try {
+    const updates = []
+    const states = panelStates()
+    states[22] = false // supportsUpdate: the capabilities probe said no
+    const { registrations } = install(loadBundle(states, (index, next) => updates.push({ index, next })))
+    const tree = renderPanel(registrations)
+    const buttons = []
+    const collect = (element) => {
+      if (!element || typeof element !== 'object') return
+      if (Array.isArray(element)) { element.forEach(collect); return }
+      if (element.$$element !== true) return
+      if (element.type === 'button') buttons.push(element)
+      element.children.forEach(collect)
+      if (typeof element.type === 'function') collect(element.type(element.props))
+    }
+    collect(tree)
+    const update = buttons.find((button) => button.props.children === 'action.update')
+    assert.ok(update, 'the update button still renders on an old Host')
+    assert.ok(String(update.props.title).includes('action.updateRestart'), 'the tooltip explains why')
+    update.props.onClick()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.deepEqual(requests, [], 'nothing is sent to a Host that cannot do it')
+    const notice = updates.filter((entry) => entry.index === 5).pop()
+    assert.equal(notice.next.kind, 'error')
+    assert.equal(notice.next.text, 'action.updateRestart')
+    assert.equal(updates.some((entry) => entry.index === 19), false, 'no dialog is opened either')
   } finally {
     delete globalThis.fetch
   }

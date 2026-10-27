@@ -37,6 +37,7 @@ const SERIALIZED_OPS = new Set([
   'squash',
   'fetch',
   'pull',
+  'updateProject',
   'push',
   'deleteRemoteBranch',
   'addRemote',
@@ -144,6 +145,7 @@ const TOOL_ACTIONS = {
   diff: 'diff',
   fetch: 'fetch',
   pull: 'pull',
+  update_project: 'updateProject',
   push: 'push',
   stage: 'stage',
   unstage: 'unstage',
@@ -179,6 +181,7 @@ const TOOL_ARGUMENTS = [
   'sha',
   'mode',
   'startPoint',
+  'strategy',
   'max',
   'shas',
 ]
@@ -198,6 +201,11 @@ function summarize(action, data) {
     return `将压缩 ${data.commits?.length ?? 0} 个提交：${(data.commits ?? []).map((entry) => entry.subject).join(' | ')}`
   }
   if (action === 'status') return `当前分支 ${data.status?.branch ?? '(detached)'}，变更 ${data.status?.files?.length ?? 0} 个`
+  if (action === 'update_project') {
+    if (data.updated === false) return `${data.branch} 已经是最新的（${data.upstream}）`
+    const verb = data.strategy === 'rebase' ? '变基' : data.strategy === 'reset' ? '重置' : '合并'
+    return `已把 ${data.upstream} 的 ${data.behind} 个提交${verb}到 ${data.branch}`
+  }
   if (action === 'diff') return data.diff ? `差异 ${String(data.diff).length} 字符${data.truncated ? '（已截断）' : ''}` : '无差异'
   if (action === 'discover') {
     const repos = (data.repos ?? []).filter((entry) => entry.isRepo)
@@ -233,6 +241,11 @@ function registerTool(toolCtx, run, settings) {
         sha: { type: 'string', description: '提交哈希（commit_detail/revert/cherry_pick）。' },
         mode: { type: 'string', enum: ['soft', 'mixed', 'hard', 'keep'], description: 'reset 模式。' },
         startPoint: { type: 'string', description: '创建分支的起点。' },
+        strategy: {
+          type: 'string',
+          enum: ['merge', 'rebase', 'reset'],
+          description: 'update_project 的整合方式：merge 合并（默认）/ rebase 变基 / reset 硬重置到远端分支。',
+        },
         shas: {
           type: 'array',
           items: { type: 'string' },
