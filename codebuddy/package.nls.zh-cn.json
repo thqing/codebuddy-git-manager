@@ -1,0 +1,11 @@
+{
+  "displayName": "Git 管理 for CodeBuddy",
+  "description": "CodeBuddy / VS Code 的 IDEA 风格 Git 工具窗口：分支树、提交图、差异与图形化 Git 操作。",
+  "command.category": "Git 管理",
+  "command.open.title": "打开",
+  "configuration.title": "Git 管理",
+  "config.extraRepos.description": "除当前工作区外，额外显示在 Git 管理面板中的仓库目录。",
+  "config.maxCommits.description": "提交图最多加载的提交数量。",
+  "config.timeoutMs.description": "本地 Git 操作的超时时间（毫秒）。",
+  "config.networkTimeoutMs.description": "Fetch、Pull 和 Push 的超时时间（毫秒）。"
+}

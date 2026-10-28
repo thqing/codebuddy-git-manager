@@ -1,0 +1,7 @@
+.gitignore
+src/**
+test/**
+scripts/**
+node_modules/**
+dist/**/*.map
+*.vsix

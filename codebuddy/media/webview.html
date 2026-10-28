@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="__LANG__">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; img-src __CSP_SOURCE__ data:; style-src __CSP_SOURCE__ 'unsafe-inline'; script-src 'nonce-__NONCE__'; font-src __CSP_SOURCE__;">
+  <title>Git Manager</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+
+      /* Map the shared UI's DSH design tokens onto CodeBuddy/VS Code theme tokens. */
+      --dsw-alias-label-primary: var(--vscode-foreground, #1f2329);
+      --dsw-alias-label-secondary: var(--vscode-descriptionForeground, #646a73);
+      --dsw-alias-label-tertiary: var(--vscode-disabledForeground, #8f959e);
+      --dsw-alias-border-l2: var(--vscode-panel-border, rgba(128, 132, 142, .24));
+      --dsw-alias-border-l3: var(--vscode-widget-border, rgba(128, 132, 142, .36));
+      --dsw-alias-bg-base: var(--vscode-editor-background, #fff);
+      --dsw-alias-bg-layer-1: var(--vscode-sideBar-background, rgba(128, 132, 142, .06));
+      --dsw-alias-bg-layer-2: var(--vscode-editorWidget-background, rgba(128, 132, 142, .10));
+      --dsw-alias-bg-layer-3: var(--vscode-editorWidget-background, rgba(128, 132, 142, .14));
+      --dsw-alias-interactive-bg-hover: var(--vscode-list-hoverBackground, rgba(128, 132, 142, .12));
+      --dsw-alias-state-business-primary: var(--vscode-textLink-foreground, #4176e6);
+      --dsw-alias-state-success-primary: var(--vscode-gitDecoration-addedResourceForeground, #34c724);
+      --dsw-alias-state-warn-primary: var(--vscode-gitDecoration-modifiedResourceForeground, #ff8800);
+      --dsw-alias-state-error-primary: var(--vscode-gitDecoration-deletedResourceForeground, #f54a45);
+      --dsw-alias-state-idle-primary: var(--vscode-descriptionForeground, #8f959e);
+      --dsw-alias-button-primary-fill: var(--vscode-button-background, #0f1115);
+      --dsw-alias-label-primary-foreground: var(--vscode-button-foreground, #fff);
+      --dsw-alias-button-primary-hover: var(--vscode-button-hoverBackground, #3a3d45);
+      --dsw-alias-bg-overlay: var(--vscode-editorWidget-background, #fff);
+      --dsw-elevation-prominent: var(--vscode-widget-shadow, rgba(0, 0, 0, .28));
+      --dsw-radius-md: 4px;
+      --dsw-radius-lg: 6px;
+      --dsh-frame-top-clearance: 0px;
+      --ds-font-family-code: var(--vscode-editor-font-family, monospace);
+    }
+
+    html,
+    body,
+    #root {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    body {
+      color: var(--vscode-foreground, #1f2329);
+      background: var(--vscode-editor-background, #fff);
+      font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      font-size: var(--vscode-font-size, 13px);
+    }
+
+    * {
+      scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(128, 132, 142, .38)) transparent;
+      scrollbar-width: thin;
+    }
+
+    ::selection {
+      color: var(--vscode-editor-selectionForeground, inherit);
+      background: var(--vscode-editor-selectionBackground, rgba(65, 118, 230, .25));
+    }
+
+    input,
+    textarea,
+    select,
+    button {
+      font-family: inherit;
+    }
+
+    .boot-error {
+      margin: 24px;
+      padding: 16px;
+      border: 1px solid var(--vscode-inputValidation-errorBorder, #f54a45);
+      border-radius: 6px;
+      color: var(--vscode-errorForeground, #f54a45);
+      background: var(--vscode-inputValidation-errorBackground, transparent);
+    }
+
+    .boot-error pre {
+      margin: 10px 0 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 12px;
+    }
+
+    @media (max-width: 760px) {
+      .dg-side {
+        width: 220px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .dg-body {
+        flex-direction: column;
+      }
+
+      .dg-side {
+        width: auto;
+        max-height: 38%;
+        border-right: 0;
+        border-bottom: 1px solid var(--dg-border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script nonce="__NONCE__">
+    window.__ModuleLoader__ = {
+      load(definition) {
+        window.__DSH_GIT_DEFINITION__ = definition;
+      }
+    };
+  </script>
+  <script nonce="__NONCE__" src="__SCRIPT_URI__"></script>
+</body>
+</html>

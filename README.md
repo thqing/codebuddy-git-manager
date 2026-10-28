@@ -4,6 +4,9 @@
 中间 **提交图（commit graph）**，下方 **提交详情 / 差异 / 变更** 三个页签，
 工具栏与右键菜单覆盖常用 Git 操作。
 
+> **CodeBuddy / VS Code 版本**：仓库新增了独立扩展包 [`codebuddy/`](codebuddy/README.md)，
+> 复用同一套 Git 引擎与 UI，可打包为 `.vsix` 安装到 CodeBuddy IDE。原 DSH 入口保持不变。
+
 ## 功能
 
 **仓库**

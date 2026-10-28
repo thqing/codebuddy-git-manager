@@ -1,0 +1,11 @@
+{
+  "displayName": "Git Manager for CodeBuddy",
+  "description": "IDEA-style Git tool window for CodeBuddy / VS Code: branch tree, commit graph, diffs and graphical Git operations.",
+  "command.category": "Git Manager",
+  "command.open.title": "Open",
+  "configuration.title": "Git Manager",
+  "config.extraRepos.description": "Additional repository directories shown in the Git Manager, besides the current workspace folders.",
+  "config.maxCommits.description": "Maximum number of commits requested for the commit graph.",
+  "config.timeoutMs.description": "Timeout in milliseconds for local Git operations.",
+  "config.networkTimeoutMs.description": "Timeout in milliseconds for fetch, pull and push."
+}

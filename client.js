@@ -351,6 +351,11 @@ window.__ModuleLoader__.load({
 
     /** One Host call; a business failure throws an Error carrying its detail. */
     async function call(payload) {
+      // The CodeBuddy/VS Code host injects this bridge before mounting the panel.
+      // Keep the DSH Fetch transport below unchanged for the original host.
+      if (typeof globalThis.__DSH_GIT_CALL__ === 'function') {
+        return globalThis.__DSH_GIT_CALL__(payload)
+      }
       const response = await fetch(`${apiBase()}${API_PATH}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -390,6 +395,12 @@ window.__ModuleLoader__.load({
 
     function copyText(text) {
       try {
+        // VS Code webviews cannot rely on the async Clipboard API in every
+        // Electron/remote combination; the extension host writes it instead.
+        if (typeof globalThis.__DSH_GIT_COPY__ === 'function') {
+          globalThis.__DSH_GIT_COPY__(text)
+          return
+        }
         void globalThis.navigator?.clipboard?.writeText(text)
       } catch {
         /* Clipboard access is best-effort. */
@@ -2016,7 +2027,7 @@ window.__ModuleLoader__.load({
           ? []
           : (localTree.count > 0
             ? renderTree(localTree, 0, 'local', localBranchRow)
-            : [h('div', { className: 'dg-hint dg-indent', key: 'e' }, t('tree.empty'))])),
+            : [h('div', { className: 'dg-hint dg-indent', key: 'local-empty' }, t('tree.empty'))])),
 
         h('div', { className: 'dg-section', key: 'h-remote' }, [
           h('span', { key: 'c', className: `dg-caret dg-clickable${collapsed.remote ? '' : ' dg-open'}`, onClick: () => setCollapsed((c) => ({ ...c, remote: !c.remote })) }, h(CaretGlyph)),
@@ -2049,7 +2060,7 @@ window.__ModuleLoader__.load({
                   : []),
               ]
             })
-            : [h('div', { className: 'dg-hint dg-indent', key: 'e' }, t('tree.empty'))])),
+            : [h('div', { className: 'dg-hint dg-indent', key: 'remote-empty' }, t('tree.empty'))])),
 
         h('div', { className: 'dg-section', key: 'h-tags' }, [
           h('span', { key: 'c', className: `dg-caret dg-clickable${collapsed.tags ? '' : ' dg-open'}`, onClick: () => setCollapsed((c) => ({ ...c, tags: !c.tags })) }, h(CaretGlyph)),

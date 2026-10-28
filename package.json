@@ -42,7 +42,10 @@
     }
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "test:codebuddy": "npm --prefix codebuddy test",
+    "build:codebuddy": "npm --prefix codebuddy run build",
+    "package:codebuddy": "npm --prefix codebuddy run package:vsix"
   },
   "keywords": [
     "dsh",

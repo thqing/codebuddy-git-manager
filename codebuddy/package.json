@@ -1,0 +1,238 @@
+{
+  "name": "codebuddy-git-manager",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "1.0.0",
+  "publisher": "thqing",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "branch",
+    "commit graph",
+    "codebuddy",
+    "vscode"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thqing/dsh-git-manager.git"
+  },
+  "homepage": "https://github.com/thqing/dsh-git-manager",
+  "bugs": {
+    "url": "https://github.com/thqing/dsh-git-manager/issues"
+  },
+  "activationEvents": [
+    "onCommand:codebuddyGitManager.open",
+    "onWebviewPanel:codebuddyGitManager.panel"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "codebuddyGitManager.open",
+        "title": "%command.open.title%",
+        "category": "%command.category%",
+        "icon": "$(git-branch)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "codebuddyGitManager.open"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "codebuddyGitManager.open",
+          "group": "navigation@100"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "%configuration.title%",
+      "properties": {
+        "codebuddyGitManager.extraRepos": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine-overridable",
+          "description": "%config.extraRepos.description%"
+        },
+        "codebuddyGitManager.maxCommits": {
+          "type": "number",
+          "default": 400,
+          "minimum": 20,
+          "maximum": 5000,
+          "description": "%config.maxCommits.description%"
+        },
+        "codebuddyGitManager.timeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 1000,
+          "description": "%config.timeoutMs.description%"
+        },
+        "codebuddyGitManager.networkTimeoutMs": {
+          "type": "number",
+          "default": 180000,
+          "minimum": 1000,
+          "description": "%config.networkTimeoutMs.description%"
+        }
+      }
+    },
+    "languageModelTools": [
+      {
+        "name": "codebuddyGitManager_gitManage",
+        "toolReferenceName": "gitManager",
+        "displayName": "Git Manager",
+        "modelDescription": "Run read or write Git operations in a repository, sharing the same implementation as the Git Manager UI. Use repo as an absolute repository path; when omitted, the current workspace or first configured repository is used.",
+        "tags": [
+          "git",
+          "version-control"
+        ],
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action"
+          ],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "status",
+                "repo_info",
+                "branches",
+                "log",
+                "commit_detail",
+                "diff",
+                "fetch",
+                "pull",
+                "update_project",
+                "push",
+                "stage",
+                "unstage",
+                "discard",
+                "commit_staged",
+                "checkout",
+                "create_branch",
+                "delete_branch",
+                "merge",
+                "rebase",
+                "revert",
+                "reset",
+                "squash",
+                "squash_preview",
+                "cherry_pick",
+                "stash_push",
+                "stash_pop",
+                "stash_list",
+                "create_tag",
+                "remotes",
+                "discover"
+              ],
+              "description": "Git operation to perform."
+            },
+            "repo": {
+              "type": "string",
+              "description": "Absolute repository working directory."
+            },
+            "ref": {
+              "type": "string",
+              "description": "Branch, tag or revision used by checkout/merge/rebase/reset."
+            },
+            "name": {
+              "type": "string",
+              "description": "Branch or tag name to create."
+            },
+            "message": {
+              "type": "string",
+              "description": "Commit, merge or tag message."
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "File paths for stage/unstage/discard/diff."
+            },
+            "remote": {
+              "type": "string",
+              "description": "Remote name, for example origin."
+            },
+            "branch": {
+              "type": "string",
+              "description": "Remote branch name for pull/push/delete."
+            },
+            "sha": {
+              "type": "string",
+              "description": "Commit hash for commit_detail/revert/cherry_pick."
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "soft",
+                "mixed",
+                "hard",
+                "keep"
+              ],
+              "description": "Reset mode."
+            },
+            "startPoint": {
+              "type": "string",
+              "description": "Start point for branch creation."
+            },
+            "strategy": {
+              "type": "string",
+              "enum": [
+                "merge",
+                "rebase",
+                "reset"
+              ],
+              "description": "Integration strategy for update_project."
+            },
+            "shas": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Commit hashes for squash/squash_preview."
+            },
+            "max": {
+              "type": "integer",
+              "description": "Maximum commits returned by log."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "preview": "npm run build && node scripts/preview.mjs",
+    "test": "npm run build && node --test test/",
+    "package:vsix": "npm run build && vsce package --no-dependencies",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "3.9.2",
+    "esbuild": "0.28.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
