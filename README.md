@@ -5,7 +5,7 @@
 - 左侧 Local / Remote 分支树，支持目录层级、上游与 ahead / behind；
 - 中间泳道式提交图，支持合并提交、多泳道和 refs 徽标；
 - 下方变更 / 提交详情 / 差异三个页签；
-- 覆盖暂存、提交、修订、Fetch、Pull、Push、Merge、Rebase、Reset、Stash、Tag 与 Squash。
+- 覆盖暂存、提交、修订、Fetch、Pull、Push、Merge、Rebase、Reset、Stash、Tag、Squash 与编辑提交信息。
 
 扩展使用系统 `git`，不依赖额外的 Git 服务；所有命令以 argv 数组执行，不经过 shell。
 
@@ -40,7 +40,7 @@
 | 工具栏 | 刷新、获取、更新项目、推送、新建分支、拉取、合并、变基、Stash、提交身份、远程管理 |
 | 本地分支右键 | 检出、新建分支、合并、变基、推送、重命名、创建标签、删除、复制名称 |
 | 远程分支右键 | 检出、新建本地分支、合并、变基、删除远程分支、复制名称 |
-| 提交右键 | 检出、创建分支/标签、Cherry-pick、Revert、Reset、复制 hash/信息 |
+| 提交右键 | 检出、创建分支/标签、Cherry-pick、Revert、编辑提交信息（仅未推送提交）、Reset、复制 hash/信息 |
 | 多选提交右键 | Squash Commits、复制多个 hash |
 | 文件右键 | 暂存、取消暂存、丢弃、查看差异 |
 
@@ -53,6 +53,17 @@
 3. 按 Merge、Rebase 或 Reset 整合上游。
 
 已经是最新时不会创建空合并提交。
+
+### 编辑提交信息
+
+相当于 IDEA 的 Edit Commit Message，只改写**未推送的本地提交**：
+
+- 对话框预填完整提交信息（标题 + 正文），改完 `Cmd/Ctrl+Enter` 或点“保存”；
+- HEAD 走 `git commit --amend --only`，已暂存的改动不会被卷进这次提交；更早的提交走交互式变基，
+  区间含合并提交时保留合并结构，根提交走 `--root`；
+- 工作区或索引有未提交改动时先 stash、改写后 `stash pop --index`，已暂存状态不丢；
+- 改写前后校验 `HEAD^{tree}` 不变，失败自动中止变基并恢复 stash；
+- 已推送的提交在菜单中禁用并说明原因；空信息、信息无变化、存在未完成的变基/合并/摘取都会被拒绝。
 
 ### Squash Commits
 
@@ -74,24 +85,55 @@ npm install
 npm run package:vsix
 ```
 
-然后：
+产物为 `codebuddy/codebuddy-git-manager-1.0.0.vsix`。然后：
 
-1. 打开 CodeBuddy IDE 扩展面板；
+1. 打开 CodeBuddy IDE / VS Code 扩展面板；
 2. 点击右上角 `…`；
 3. 选择 **Install from VSIX / 从 VSIX 安装**；
 4. 选择 `codebuddy/codebuddy-git-manager-1.0.0.vsix`；
-5. Reload Window。
+5. 执行 **Developer: Reload Window / 开发人员: 重新加载窗口**。
 
-VS Code 也可以使用命令行安装：
+> 必须重载窗口：已打开的 Git 管理面板不会自动换用新的前端 bundle。
+
+命令行安装：
 
 ```bash
+# VS Code
+code --install-extension codebuddy/codebuddy-git-manager-1.0.0.vsix
+
+# macOS 上的 CodeBuddy CN（使用 IDE 自带 CLI）
+"/Applications/CodeBuddy CN.app/Contents/Resources/app/bin/code" \
+  --install-extension "$PWD/codebuddy/codebuddy-git-manager-1.0.0.vsix"
+```
+
+### 覆盖安装 / 升级
+
+扩展版本号未变（同为 `1.0.0`）时，直接安装可能提示“已安装”。两种做法任选：
+
+```bash
+# 1) 强制覆盖
+code --install-extension codebuddy/codebuddy-git-manager-1.0.0.vsix --force
+
+# 2) 先卸载再安装
+code --uninstall-extension thqing.codebuddy-git-manager
 code --install-extension codebuddy/codebuddy-git-manager-1.0.0.vsix
 ```
 
-运行前提：
+GUI 对应做法：扩展面板卸载 **CodeBuddy Git Manager** → Reload Window → 再从 VSIX 安装。
 
-- CodeBuddy IDE 的 VS Code API 版本不低于 `1.95.0`；
+安装或覆盖后都要再执行一次 **Reload Window**。
+
+### 运行前提
+
+- CodeBuddy IDE / VS Code 的 API 版本不低于 `1.95.0`；
 - 系统 `PATH` 中可以使用 `git`。
+
+### 验证安装
+
+- 扩展面板中能看到 **CodeBuddy Git Manager 1.0.0**（发布者 `thqing`）；
+- 状态栏出现 **Git** 按钮，命令面板能搜到 **Git 管理: 打开**；
+- 提交图右键未推送的提交能看到 **编辑提交信息…**，已推送的提交为灰色；
+- 异常时查看输出面板的 **Git Manager** 通道。
 
 ### 打开面板
 
@@ -116,7 +158,7 @@ code --install-extension codebuddy/codebuddy-git-manager-1.0.0.vsix
 
 ## Agent 工具
 
-如果宿主实现 VS Code Language Model Tools API，扩展会注册 `gitManager` 工具。它和图形面板共用同一套 Git 引擎，支持 `status`、`branches`、`log`、`diff`、`stage`、`commit_staged`、`checkout`、`merge`、`rebase`、`reset`、`squash`、`update_project` 等操作。
+如果宿主实现 VS Code Language Model Tools API，扩展会注册 `gitManager` 工具。它和图形面板共用同一套 Git 引擎，支持 `status`、`branches`、`log`、`diff`、`stage`、`commit_staged`、`checkout`、`merge`、`rebase`、`reset`、`squash`、`update_project`、`reword_commit` 等操作。
 
 该工具是否出现在 CodeBuddy Agent 的工具列表中，取决于宿主对 Language Model Tools API 的支持；图形面板本身不依赖它。
 
@@ -190,7 +232,7 @@ npm test
 - Webview RPC 成功、失败、超时和销毁；
 - 工作区发现、Snapshot、Git 错误包络；
 - 同一仓库写操作串行化；
-- Squash、未跟踪文件 diff、提交图几何和分支树交互。
+- Squash、编辑提交信息（HEAD/老提交/根提交/合并提交）、未跟踪文件 diff、提交图几何和分支树交互。
 
 ## 安全设计
 

@@ -63,6 +63,17 @@ test('a git failure can be converted to a Webview envelope', async () => {
   }
 })
 
+test('reword rewrites the message through the extension host', async () => {
+  const before = await host.run({ op: 'snapshot', repo: root, max: 20 })
+  const head = before.log.commits[0].hash
+  assert.equal(before.log.commits[0].pushed, false, 'a repository without remotes has no published commits')
+  const data = await host.run({ op: 'reword', repo: root, sha: head, message: 'init (rewritten)' })
+  assert.equal(data.changed, true)
+  assert.equal(data.subject, 'init (rewritten)')
+  const after = await host.run({ op: 'snapshot', repo: root, max: 20 })
+  assert.equal(after.log.commits[0].subject, 'init (rewritten)')
+})
+
 test('mutations are serialized per repository', async () => {
   const enqueue = createQueue()
   let active = 0

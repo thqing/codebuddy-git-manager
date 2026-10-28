@@ -7,13 +7,30 @@ CodeBuddy IDE / VS Code 的 IDEA 风格 Git 工具窗口：分支树、提交图
 1. 在扩展面板右上角点击 `…`；
 2. 选择 **Install from VSIX / 从 VSIX 安装**；
 3. 选择 `codebuddy-git-manager-1.0.0.vsix`；
-4. Reload Window。
+4. 执行 **Developer: Reload Window / 开发人员: 重新加载窗口**。
 
-VS Code 命令行：
+命令行安装：
 
 ```bash
+# VS Code
+code --install-extension codebuddy-git-manager-1.0.0.vsix
+
+# macOS 上的 CodeBuddy CN（使用 IDE 自带 CLI）
+"/Applications/CodeBuddy CN.app/Contents/Resources/app/bin/code" \
+  --install-extension "$PWD/codebuddy-git-manager-1.0.0.vsix"
+```
+
+覆盖安装（版本号同为 `1.0.0` 时直接安装可能提示“已安装”）：
+
+```bash
+code --install-extension codebuddy-git-manager-1.0.0.vsix --force
+
+# 或先卸载再安装
+code --uninstall-extension thqing.codebuddy-git-manager
 code --install-extension codebuddy-git-manager-1.0.0.vsix
 ```
+
+GUI 对应做法：卸载 **CodeBuddy Git Manager** → Reload Window → 再从 VSIX 安装。安装或覆盖后都必须重载窗口，已打开的面板不会自动换用新 bundle。
 
 运行前提：
 
@@ -34,6 +51,7 @@ code --install-extension codebuddy-git-manager-1.0.0.vsix
 - 已暂存 / 未暂存 / 未跟踪文件，支持暂存、取消暂存、丢弃和 diff；
 - 提交、修订、Fetch、Pull、Push、Merge、Rebase、Reset、Stash、Cherry-pick、Tag；
 - 更新项目：Fetch 后按 Merge / Rebase / Reset 整合上游；
+- 编辑提交信息：只改写未推送的本地提交，预填标题与正文，保留暂存状态与合并结构；
 - Squash：多选相邻提交，预校验后编辑提交信息并显示净变更；
 - 分支、提交和文件右键菜单。
 

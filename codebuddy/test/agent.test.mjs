@@ -39,3 +39,25 @@ test('tool summaries match the DSH agent wording', () => {
     branch: 'main',
   }), /变基到 main/)
 })
+
+test('reword_commit maps onto the engine and summarizes both outcomes', () => {
+  assert.deepEqual(toPayload({
+    action: 'reword_commit',
+    repo: '/repo',
+    sha: 'a'.repeat(40),
+    message: 'feat: new subject',
+  }, '/default'), {
+    op: 'reword',
+    repo: '/repo',
+    sha: 'a'.repeat(40),
+    message: 'feat: new subject',
+  })
+  assert.equal(
+    summarize('reword_commit', { sha: 'a'.repeat(40), subject: 'feat: new subject', changed: true }),
+    '已改写 aaaaaaaa 的提交信息：feat: new subject',
+  )
+  assert.equal(
+    summarize('reword_commit', { sha: 'a'.repeat(40), changed: false }),
+    'aaaaaaaa 的提交信息没有变化',
+  )
+})

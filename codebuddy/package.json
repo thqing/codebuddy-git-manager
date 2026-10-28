@@ -123,6 +123,7 @@
                 "fetch",
                 "pull",
                 "update_project",
+                "reword_commit",
                 "push",
                 "stage",
                 "unstage",
@@ -180,7 +181,7 @@
             },
             "sha": {
               "type": "string",
-              "description": "Commit hash for commit_detail/revert/cherry_pick."
+              "description": "Commit hash for commit_detail/revert/cherry_pick/reword_commit."
             },
             "mode": {
               "type": "string",

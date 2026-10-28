@@ -13,6 +13,7 @@ export const TOOL_ACTIONS = {
   fetch: 'fetch',
   pull: 'pull',
   update_project: 'updateProject',
+  reword_commit: 'reword',
   push: 'push',
   stage: 'stage',
   unstage: 'unstage',
@@ -91,6 +92,10 @@ export function summarize(action, data) {
     if (data.updated === false) return `${data.branch} 已经是最新的（${data.upstream}）`
     const verb = data.strategy === 'rebase' ? '变基' : data.strategy === 'reset' ? '重置' : '合并'
     return `已把 ${data.upstream} 的 ${data.behind} 个提交${verb}到 ${data.branch}`
+  }
+  if (action === 'reword_commit') {
+    if (data.changed === false) return `${String(data.sha ?? '').slice(0, 8)} 的提交信息没有变化`
+    return `已改写 ${String(data.sha ?? '').slice(0, 8)} 的提交信息：${data.subject ?? ''}`
   }
   if (action === 'diff') {
     return data.diff

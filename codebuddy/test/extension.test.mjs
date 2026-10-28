@@ -196,6 +196,7 @@ test('the Webview RPC bridge executes the shared Git host', async () => {
   assert.ok(response)
   assert.equal(response.ok, true)
   assert.ok(response.data.ops.includes('squash'))
+  assert.ok(response.data.ops.includes('reword'))
 })
 
 test('clipboard requests are handled by the extension host', async () => {

@@ -26,6 +26,7 @@ export const SERIALIZED_OPS = new Set([
   'revert',
   'reset',
   'squash',
+  'reword',
   'fetch',
   'pull',
   'updateProject',

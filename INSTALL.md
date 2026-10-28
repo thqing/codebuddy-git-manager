@@ -15,7 +15,7 @@
 | `git.js` | 纯 Git 引擎（校验 → `execFile('git', argv)` → JSON），可脱离 DSH 单独测试 |
 | `client.js` | 浏览器半边：侧栏图标 + `git` 主面板（分支树 / 提交图 / 差异 / 变更 / 多选 / Squash） |
 | `icon.svg` `locale/` | 插件卡片图标与标题文案 |
-| `test/` | 50 个用例，`npm test` 即可跑，**不需要 DSH** |
+| `test/` | 63 个用例，`npm test` 即可跑，**不需要 DSH** |
 | `docs/` | 提交图渲染预览图 |
 
 ---
@@ -102,7 +102,7 @@ pnpm 会把 tarball 解包成 profile 自己的副本，所以插件运行不依
 | 侧栏图标 | 「全局面板」区出现 Git 图标，点开能看到分支树与提交图 |
 | 客户端注册 | `cordis_inspect_query` → platform `client`、provider `Slots`、method `listSubTree`、input `{"root":"sidebar.panellist"}`，occupants 里应有 `git` |
 | Host 能力 | 调 `git_manage`（例如 `action: branches`, `repo: <你的仓库>`），能返回分支统计 |
-| 引擎单测 | 在插件目录执行 `npm test`（50 个用例：squash / 未跟踪文件 diff / 提交图几何 / 多选交互） |
+| 引擎单测 | 在插件目录执行 `npm test`（63 个用例：squash / 未跟踪文件 diff / 提交图几何 / 多选交互） |
 
 ---
 
@@ -110,7 +110,7 @@ pnpm 会把 tarball 解包成 profile 自己的副本，所以插件运行不依
 
 ```bash
 cd dsh-git-manager
-npm test                 # 先保证 50 个用例通过
+npm test                 # 先保证 63 个用例通过
 git commit -am "..."     # 源码方式直接生效；tgz/npm 方式需要重新打包发布
 ```
 
